@@ -2,117 +2,130 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# --- การตั้งค่าหน้าจอ ---
-st.set_page_config(page_title="Lost & Found | ศูนย์แจ้งของหาย", page_icon="🔍", layout="centered")
+# 1. Page Configuration (ต้องอยู่บนสุด)
+st.set_page_config(
+    page_title="Lost & Found | มินิมอล",
+    page_icon="🌸",
+    layout="centered"
+)
 
-# --- Custom CSS สำหรับคุมโทนชมพู-ขาว ---
+# 2. Initialize Session State (ป้องกัน Error ทันทีที่เปิดแอป)
+if 'items' not in st.session_state:
+    st.session_state.items = [
+        {"type": "ของหาย", "name": "กระเป๋าสตางค์สีดำ", "loc": "ตึกคอมพิวเตอร์", "date": "2026-02-18", "contact": "081-xxx-xxxx"},
+        {"type": "พบของ", "name": "กุญแจรถยนต์", "loc": "โรงอาหาร", "date": "2026-02-17", "contact": "ติดต่อเคาน์เตอร์ประชาสัมพันธ์"}
+    ]
+
+# 3. Custom CSS สำหรับความ Minimalist และโทนชมพู
 st.markdown("""
     <style>
-    /* เปลี่ยนสีพื้นหลังหลัก */
-    .stApp {
-        background-color: #fff5f7;
-    }
-    /* ปรับแต่งปุ่ม */
+    @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500&display=swap');
+    
+    * { font-family: 'Kanit', sans-serif; }
+    
+    /* พื้นหลังและโทนสี */
+    .stApp { background-color: #FFFFFF; }
+    
+    /* ปรับแต่งปุ่มให้มนและนิ่มนวล */
     div.stButton > button {
-        background-color: #ff85a2;
+        background-color: #FFB6C1;
         color: white;
-        border-radius: 20px;
         border: none;
-        padding: 10px 24px;
-        font-weight: bold;
+        border-radius: 12px;
+        padding: 0.5rem 2rem;
+        transition: all 0.3s;
     }
     div.stButton > button:hover {
-        background-color: #ff6b8e;
-        color: white;
+        background-color: #FF8DA1;
+        box-shadow: 0 4px 12px rgba(255, 182, 193, 0.4);
     }
-    /* ปรับแต่งหัวข้อ */
-    h1, h2, h3 {
-        color: #ff85a2 !important;
-    }
-    /* ปรับแต่ง Card */
-    .item-card {
-        background-color: white;
+
+    /* สไตล์ Card สิ่งของ */
+    .card {
         padding: 20px;
         border-radius: 15px;
-        border-left: 5px solid #ff85a2;
-        box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
+        background-color: #FFF9FA;
+        border: 1px solid #FFE4E8;
         margin-bottom: 15px;
     }
+    .badge-lost { color: #FF6B6B; font-weight: 500; font-size: 0.85rem; }
+    .badge-found { color: #4CAF50; font-weight: 500; font-size: 0.85rem; }
+    
+    /* ปรับแต่ง Tabs */
+    .stTabs [data-baseweb="tab-list"] { gap: 20px; }
+    .stTabs [data-baseweb="tab"] {
+        color: #999;
+        border: none;
+    }
+    .stTabs [data-baseweb="tab-highlight"] { background-color: #FFB6C1; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- ส่วนหัวของ Web App ---
-st.title("🔍 Lost & Found Center")
-st.subheader("ศูนย์รวมแจ้งของหายและของที่เก็บได้")
+# --- ส่วนแสดงผลหน้าเว็บ ---
 
-# --- Tabs สำหรับเมนูหลัก ---
-tab1, tab2, tab3 = st.tabs(["🏠 หน้าแรก", "📝 แจ้งเรื่องใหม่", "📊 สถิติ"])
+st.markdown("<h1 style='text-align: center; color: #FF8DA1;'>🌸 Lost & Found</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #888;'>ศูนย์รวมแจ้งของหาย-พบของที่เรียบง่ายที่สุด</p>", unsafe_allow_html=True)
+st.write("")
 
-# --- จำลองฐานข้อมูล (ในที่นี้ใช้ List ธรรมดา - ถ้าใช้จริงแนะนำให้เชื่อม Google Sheets) ---
-if 'items' not in st.session_state:
-    st.session_state.items = [
-        {"type": "ของหาย", "name": "กระเป๋าสตางค์สีดำ", "loc": "ตึก A", "date": "2026-02-18"},
-        {"type": "พบของ", "name": "กุญแจรถยนต์", "loc": "ลานจอดรถ", "date": "2026-02-17"}
-    ]
+# สร้าง Tabs
+tab1, tab2 = st.tabs(["🔍 ดูประกาศทั้งหมด", "✍️ แจ้งเรื่องใหม่"])
 
-# --- Tab 1: หน้าแรก (แสดงรายการ) ---
 with tab1:
-    col1, col2 = st.columns([3, 1])
+    # ส่วนค้นหาแบบ Minimal
+    col1, col2 = st.columns([2, 1])
     with col1:
-        search = st.text_input("🔍 ค้นหาสิ่งของ...", placeholder="เช่น กุญแจ, กระเป๋า")
+        search_query = st.text_input("", placeholder="ค้นหาสิ่งของ...")
     with col2:
-        filter_type = st.selectbox("ประเภท", ["ทั้งหมด", "ของหาย", "พบของ"])
+        filter_type = st.selectbox("", ["ทั้งหมด", "ของหาย", "พบของ"])
 
     st.write("---")
-    
+
+    # แสดงผลรายการ
     for item in st.session_state.items:
         # กรองข้อมูล
         if filter_type != "ทั้งหมด" and item['type'] != filter_type:
             continue
-        if search.lower() not in item['name'].lower():
+        if search_query.lower() not in item['name'].lower():
             continue
-            
-        # แสดงผลในรูปแบบ Card
+
+        badge_class = "badge-lost" if item['type'] == "ของหาย" else "badge-found"
+        
         st.markdown(f"""
-            <div class="item-card">
-                <span style="color: {'#ff4b4b' if item['type'] == 'ของหาย' else '#28a745'}; font-weight: bold;">
-                    [{item['type']}]
-                </span>
-                <h4 style="margin: 5px 0;">{item['name']}</h4>
-                <p style="font-size: 0.9em; color: #666;">
-                    📍 สถานที่: {item['loc']} <br>
-                    📅 วันที่: {item['date']}
+            <div class="card">
+                <span class="{badge_class}">• {item['type']}</span>
+                <h3 style="margin: 5px 0; color: #444;">{item['name']}</h3>
+                <p style="margin: 0; color: #777; font-size: 0.9rem;">
+                    📍 {item['loc']} | 📅 {item['date']}
                 </p>
+                <div style="margin-top: 10px; font-size: 0.85rem; color: #FF8DA1;">
+                    📞 ติดต่อ: {item['contact']}
+                </div>
             </div>
         """, unsafe_allow_html=True)
 
-# --- Tab 2: แจ้งเรื่องใหม่ ---
 with tab2:
-    st.markdown("### กรอกรายละเอียด")
-    with st.form("report_form", clear_on_submit=True):
-        new_type = st.radio("ประเภทการแจ้ง", ["ของหาย", "พบของ"], horizontal=True)
-        new_name = st.text_input("ชื่อสิ่งของ")
-        new_loc = st.text_input("สถานที่")
-        new_date = st.date_input("วันที่เกิดเหตุ")
-        new_img = st.file_uploader("แนบรูปภาพ (ถ้ามี)", type=['jpg', 'png'])
+    st.markdown("<h4 style='color: #FF8DA1;'>กรอกรายละเอียดสิ่งของ</h4>", unsafe_allow_html=True)
+    with st.form("new_report", clear_on_submit=True):
+        type_choice = st.radio("ประเภท", ["ของหาย", "พบของ"], horizontal=True)
+        item_name = st.text_input("ชื่อสิ่งของ*")
+        location = st.text_input("สถานที่*")
+        contact_info = st.text_input("เบอร์โทรหรือช่องทางติดต่อ")
+        report_date = st.date_input("วันที่", value=datetime.now())
         
-        submitted = st.form_submit_button("บันทึกข้อมูล")
+        submitted = st.form_submit_button("ลงประกาศ")
+        
         if submitted:
-            if new_name and new_loc:
-                new_entry = {
-                    "type": new_type,
-                    "name": new_name,
-                    "loc": new_loc,
-                    "date": str(new_date)
+            if item_name and location:
+                new_data = {
+                    "type": type_choice,
+                    "name": item_name,
+                    "loc": location,
+                    "date": str(report_date),
+                    "contact": contact_info if contact_info else "ไม่ระบุ"
                 }
-                st.session_state.items.insert(0, new_entry)
-                st.success("บันทึกข้อมูลสำเร็จแล้ว!")
+                # เพิ่มข้อมูลไว้ด้านบนสุดของลิสต์
+                st.session_state.items.insert(0, new_data)
+                st.success("บันทึกข้อมูลเรียบร้อยแล้ว!")
+                st.rerun() # สั่งรีเฟรชหน้าจอเพื่อแสดงข้อมูลใหม่ทันที
             else:
-                st.error("กรุณากรอกข้อมูลให้ครบถ้วน")
-
-# --- Tab 3: สถิติ (Dashboard เล็กๆ) ---
-with tab3:
-    st.write("ภาพรวมระบบ")
-    df = pd.DataFrame(st.session_state.items)
-    if not df.empty:
-        st.bar_chart(df['type'].value_counts())
+                st.warning("กรุณากรอกชื่อสิ่งของและสถานที่")
